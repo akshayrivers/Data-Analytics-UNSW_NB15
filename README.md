@@ -507,7 +507,7 @@ The codebase requires Python 3.10+ and standard scientific libraries.
 
 ```bash
 # Clone the repository
-git clone https://github.com/<your-username>/UNSW-NB15-Statistical-Analysis.git
+git clone https://github.com/akshayrivers/Data-Analytics-UNSW_NB15.git
 cd UNSW-NB15-Statistical-Analysis
 
 # Create and activate a virtual environment
