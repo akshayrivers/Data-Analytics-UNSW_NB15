@@ -218,3 +218,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+make_ppt.py
+make_ppt6.py
+make_report.py
+*.pptx
+*.docx
+
+.DS_Store
