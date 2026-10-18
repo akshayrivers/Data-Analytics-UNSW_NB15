@@ -30,47 +30,43 @@
 
 ## 1. Executive Summary & Project Overview
 
-This repository provides an empirical, end-to-end statistical analysis of the **UNSW-NB15** network security dataset, created by the Australian Centre for Cyber Security (ACCS) using an IXIA PerfectStorm cyber range. The complete dataset aggregates **$N = 257,673$ network flows** across 49 features, capturing realistic modern normal traffic and nine distinct synthetic cyber-attack families.
+This repository provides an empirical, end-to-end statistical analysis of the **UNSW-NB15** network security dataset, created by the Australian Centre for Cyber Security (ACCS) using an IXIA PerfectStorm traffic generator. The goal is to quantify how standard network-flow summary statistics, confidence intervals, and inferential procedures behave when sample size changes from a few hundred observations to the full population.
 
 ### Core Objectives
-1. **Descriptive Characterization**: Quantify central tendency, dispersion, extreme skewness, and heavy-tailed kurtosis across key network flow metrics (`dur`, `sbytes`, `dbytes`, `rate`, `smean`, `dmean`).
-2. **Interval Estimation**: Construct $95\%$ Student's $t$ confidence intervals for continuous population means and Wilson score intervals for the population attack proportion.
-3. **Hypothesis Testing**: Formulate and evaluate four distinct statistical hypothesis tests ($\alpha = 0.05$):
-   - **T1**: Welch's two-sample $t$-test (Destination packet size: Normal vs. Attack)
-   - **T2**: Pearson's Chi-square ($\chi^2$) test of independence (Transport Protocol vs. Attack Label)
-   - **T3**: One-way Analysis of Variance (ANOVA) (Source packet size across attack families)
-   - **T4**: Bivariate correlation analysis contrasting Pearson linear correlation $r$ against Spearman monotonic rank correlation $\rho$.
-4. **Empirical Effect of Sample Size**: Evaluate all statistical estimators and test dynamics across four sample tiers:
-   - Simple Random Sample (SRS) with Seed $11$: **$n = 500$**
-   - Simple Random Sample (SRS) with Seed $22$: **$n = 2,000$**
-   - Simple Random Sample (SRS) with Seed $33$: **$n = 10,000$**
-   - Full Population Reference: **$N = 257,673$**
-5. **Methodological Rigor**: Contrast $p$-value inflation in large datasets against invariant effect size measures ($\text{Cohen's } d$, $\text{Cramér's } V$, $\eta^2$, $\rho$), demonstrating the classic "Big Data $p$-value paradox."
+1. **Descriptive Characterization**: Quantify central tendency, dispersion, skewness, and tail behavior across key network-flow metrics (`dur`, `sbytes`, `dbytes`, `rate`, `smean`, `dmean`).
+2. **Interval Estimation**: Construct $95\%$ Student's $t$ intervals for continuous means and Wilson score intervals for the attack proportion.
+3. **Hypothesis Testing**: Evaluate four inferential procedures at $\alpha = 0.05$:
+   - **T1**: Welch's two-sample $t$-test for `dmean` between Normal and Attack traffic
+   - **T2**: Pearson's $\chi^2$ test of independence between protocol group and label
+   - **T3**: One-way ANOVA for `smean` across the dominant attack families
+   - **T4**: Pearson vs. Spearman correlation for `sbytes` vs. `dbytes`
+4. **Empirical Effect of Sample Size**: Study the scaling of estimation error, confidence width, and $p$-values across $n = 500$, $2{,}000$, $10{,}000$, and the full population $N = 257{,}673$.
+5. **Methodological Rigor**: Emphasize that large samples can produce tiny $p$-values even when effect sizes are modest; therefore, we interpret statistical significance alongside effect sizes and confidence intervals.
 
 ---
 
 ## 2. Dataset Architecture & Variable Definitions
 
-The corpus combines the standardized training partition ($175,341$ records) and testing partition ($82,332$ records) into a consolidated population of **$N = 257,673$ records**.
+The corpus combines the standardized training partition ($175{,}341$ records) and testing partition ($82{,}332$ records) into a consolidated population of **$N = 257{,}673$ records**.
 
 ### 2.1 Class & Protocol Distributions
 - **Binary Traffic Classification (`label`)**:
-  - **Normal (`0`)**: $93,000$ records ($36.09\%$)
-  - **Attack (`1`)**: $164,673$ records ($63.91\%$)
+  - **Normal (`0`)**: $93{,}000$ records ($36.09\%$)
+  - **Attack (`1`)**: $164{,}673$ records ($63.91\%$)
 - **Multi-Class Attack Taxonomy (`attack_cat`)**:
-  - `Generic`: $58,871$ ($22.85\%$)
-  - `Exploits`: $44,525$ ($17.28\%$)
-  - `Fuzzers`: $24,246$ ($9.41\%$)
-  - `DoS`: $16,353$ ($6.35\%$)
-  - `Reconnaissance`: $13,987$ ($5.43\%$)
-  - `Analysis`: $2,677$ ($1.04\%$)
-  - `Backdoor`: $2,329$ ($0.90\%$)
-  - `Shellcode`: $1,511$ ($0.59\%$)
+  - `Generic`: $58{,}871$ ($22.85\%$)
+  - `Exploits`: $44{,}525$ ($17.28\%$)
+  - `Fuzzers`: $24{,}246$ ($9.41\%$)
+  - `DoS`: $16{,}353$ ($6.35\%$)
+  - `Reconnaissance`: $13{,}987$ ($5.43\%$)
+  - `Analysis`: $2{,}677$ ($1.04\%$)
+  - `Backdoor`: $2{,}329$ ($0.90\%$)
+  - `Shellcode`: $1{,}511$ ($0.59\%$)
   - `Worms`: $174$ ($0.07\%$)
 - **Protocol Aggregation (`proto_grp`)**:
-  - `tcp`: $123,041$ ($47.75\%$)
-  - `udp`: $92,701$ ($35.98\%$)
-  - `other` (unas, arp, ospf, etc.): $41,931$ ($16.27\%$)
+  - `tcp`: $123{,}041$ ($47.75\%$)
+  - `udp`: $92{,}701$ ($35.98\%$)
+  - `other` (unas, arp, ospf, etc.): $41{,}931$ ($16.27\%$)
 
 <p align="center">
   <img src="outputs/figures/bar_attackcat_counts.png" width="780" alt="Attack Category Counts">
@@ -84,15 +80,17 @@ Six continuous features representing temporal duration, byte volumes, throughput
 | Variable | Unit | Definition | Observed Domain | Statistical Character |
 | :--- | :--- | :--- | :--- | :--- |
 | `dur` | Seconds | Connection record duration | $[0.0, 59.999]$ | Extreme right skew; median $= 0.0043\text{ s}$ vs. mean $= 1.25\text{ s}$ |
-| `sbytes` | Bytes | Source-to-destination transaction bytes | $[24, 14,355,774]$ | Heavy-tailed Pareto behavior; median $= 528\text{ B}$ vs. mean $= 8,573\text{ B}$ |
-| `dbytes` | Bytes | Destination-to-source transaction bytes | $[0, 14,657,531]$ | $46.7\%$ zero-inflated (unidirectional attacks); median $= 178\text{ B}$ |
-| `rate` | Pkts/s | Total connection packet rate | $[0, 1,000,000]$ | Bimodal burst structure; attacks exhibit substantially higher rates |
-| `smean` | Bytes | Mean packet size transmitted by source | $[24, 1,504]$ | Physically bounded by Ethernet MTU; median $= 73\text{ B}$ |
-| `dmean` | Bytes | Mean packet size transmitted by destination | $[0, 1,500]$ | Bounded by MTU; highly discriminative between normal and attack flows |
+| `sbytes` | Bytes | Source-to-destination transaction bytes | $[24, 14{,}355{,}774]$ | Heavy-tailed Pareto behavior; median $= 528\text{ B}$ vs. mean $= 8{,}573\text{ B}$ |
+| `dbytes` | Bytes | Destination-to-source transaction bytes | $[0, 14{,}657{,}531]$ | $46.7\%$ zero-inflated (unidirectional traffic); median $= 178\text{ B}$ |
+| `rate` | Pkts/s | Total connection packet rate | $[0, 1{,}000{,}000]$ | Bimodal burst structure; attacks exhibit substantially higher rates |
+| `smean` | Bytes | Mean packet size transmitted by source | $[24, 1{,}504]$ | Physically bounded by Ethernet MTU; median $= 73\text{ B}$ |
+| `dmean` | Bytes | Mean packet size transmitted by destination | $[0, 1{,}500]$ | Bounded by MTU and strongly discriminative between normal and attack flows |
 
 ---
 
 ## 3. Mathematical Formulations & Statistical Methods
+
+All formulas below are written for a sample $x_1, \dots, x_n$ unless otherwise stated. The full dataset is treated as a finite population benchmark rather than as a model for repeated sampling.
 
 ### 3.1 Point Estimates & Dispersion Metrics
 For an i.i.d. sample $\{x_1, x_2, \dots, x_n\}$:
@@ -101,69 +99,108 @@ For an i.i.d. sample $\{x_1, x_2, \dots, x_n\}$:
   $$\bar{x} = \frac{1}{n} \sum_{i=1}^n x_i$$
 - **Sample Variance (Bessel's Correction)**:
   $$s^2 = \frac{1}{n-1} \sum_{i=1}^n (x_i - \bar{x})^2$$
-- **Sample Standard Deviation & Standard Error**:
-  $$s = \sqrt{s^2}, \qquad \text{SE}(\bar{x}) = \frac{s}{\sqrt{n}}$$
+- **Sample Standard Deviation**:
+  $$s = \sqrt{s^2}$$
+- **Standard Error of the Mean**:
+  $$\mathrm{SE}(\bar{x}) = \frac{s}{\sqrt{n}}$$
 - **Coefficient of Variation**:
-  $$\text{CV} = \frac{s}{\bar{x}} \quad (\bar{x} \neq 0)$$
-- **Quartile Dispersion**:
-  $$\text{IQR} = Q_3 - Q_1 = F^{-1}(0.75) - F^{-1}(0.25)$$
-- **Sample Skewness ($g_1$) & Excess Kurtosis ($g_2$)**:
-  $$g_1 = \frac{\frac{1}{n}\sum_{i=1}^n (x_i - \bar{x})^3}{\left[\frac{1}{n}\sum_{i=1}^n (x_i - \bar{x})^2\right]^{3/2}}, \qquad g_2 = \frac{\frac{1}{n}\sum_{i=1}^n (x_i - \bar{x})^4}{\left[\frac{1}{n}\sum_{i=1}^n (x_i - \bar{x})^2\right]^2} - 3$$
+  $$\mathrm{CV} = \frac{s}{|\bar{x}|}, \quad \bar{x} \neq 0$$
+- **Interquartile Range**:
+  $$\mathrm{IQR} = Q_{0.75} - Q_{0.25}$$
+- **Sample Skewness**:
+  $$g_1 = \frac{\frac{1}{n}\sum_{i=1}^n (x_i - \bar{x})^3}{\left(\frac{1}{n}\sum_{i=1}^n (x_i - \bar{x})^2\right)^{3/2}}$$
+- **Excess Kurtosis**:
+  $$g_2 = \frac{\frac{1}{n}\sum_{i=1}^n (x_i - \bar{x})^4}{\left(\frac{1}{n}\sum_{i=1}^n (x_i - \bar{x})^2\right)^2} - 3$$
+
+The final term is the excess kurtosis, so a normal distribution has $g_2 = 0$ by definition.
 
 ---
 
 ### 3.2 Interval Estimation (Confidence Intervals)
 
-#### Student's $t$ Interval for Population Mean $\mu$:
-Under the Central Limit Theorem (CLT), for $1 - \alpha = 0.95$:
-$$\text{CI}_{0.95}(\mu) = \left[ \bar{x} - t_{1-\alpha/2, \, n-1} \cdot \frac{s}{\sqrt{n}}, \;\; \bar{x} + t_{1-\alpha/2, \, n-1} \cdot \frac{s}{\sqrt{n}} \right]$$
+#### Student's $t$ Interval for a Population Mean $\mu$
+Under the CLT and using the sample standard deviation,
+$$\mathrm{CI}_{1-\alpha}(\mu) = \left[\bar{x} - t_{1-\alpha/2,\,n-1} \frac{s}{\sqrt{n}}, \; \bar{x} + t_{1-\alpha/2,\,n-1} \frac{s}{\sqrt{n}}\right].$$
+For $95\%$ intervals, $\alpha = 0.05$ and $t_{0.975, n-1}$ is used.
 
-#### Confidence Intervals for Population Proportion $p$:
-Given $k = \sum_{i=1}^n \mathbb{I}(y_i = 1)$ and $\hat{p} = \frac{k}{n}$, with critical value $z = \Phi^{-1}(1 - \alpha/2) = 1.95996$:
-1. **Wald (Standard Normal Approximation)**:
-   $$\text{CI}_{\text{Wald}} = \hat{p} \pm z \sqrt{\frac{\hat{p}(1 - \hat{p})}{n}}$$
-2. **Wilson Score Interval (Continuity/Skewness Robust)**:
-   $$\text{CI}_{\text{Wilson}} = \frac{\hat{p} + \frac{z^2}{2n}}{1 + \frac{z^2}{n}} \pm \frac{z}{1 + \frac{z^2}{n}} \sqrt{\frac{\hat{p}(1-\hat{p})}{n} + \frac{z^2}{4n^2}}$$
+#### Confidence Interval for a Population Proportion $p$
+Let $k = \sum_{i=1}^n \mathbb{I}(y_i = 1)$ and $\hat{p} = k/n$.
+
+1. **Wald interval (for comparison)**:
+   $$\mathrm{CI}_{\text{Wald}} = \hat{p} \pm z_{1-\alpha/2}\sqrt{\frac{\hat{p}(1-\hat{p})}{n}}$$
+2. **Wilson score interval (recommended for moderate or skewed proportions)**:
+   $$\mathrm{CI}_{\text{Wilson}} = \frac{\hat{p} + \frac{z^2}{2n}}{1 + \frac{z^2}{n}} \pm \frac{z}{1 + \frac{z^2}{n}} \sqrt{\frac{\hat{p}(1-\hat{p})}{n} + \frac{z^2}{4n^2}}$$
+   where $z = \Phi^{-1}(1-\alpha/2)$ and $\alpha = 0.05$ gives $z \approx 1.96$.
+
+The Wilson interval is preferred here because it remains stable when $\hat{p}$ is near 0 or 1 and when the sample is not large enough for the Wald approximation to be reliable.
 
 ---
 
 ### 3.3 Hypothesis Testing Frameworks
 
-#### T1: Welch's Two-Sample $t$-Test (Heteroscedastic Difference in Means)
-Given groups $1$ (Normal) and $2$ (Attack) with sample sizes $n_1, n_2$, means $\bar{x}_1, \bar{x}_2$, and sample variances $s_1^2, s_2^2$:
-- **Hypotheses**: $H_0: \mu_1 - \mu_2 = 0 \quad \text{vs.} \quad H_1: \mu_1 - \mu_2 \neq 0$
-- **Test Statistic**:
+#### T1: Welch's Two-Sample $t$-Test (heteroscedastic difference in means)
+For Normal vs. Attack traffic, with group means $\bar{x}_1, \bar{x}_2$, sample variances $s_1^2, s_2^2$, and sample sizes $n_1, n_2$:
+
+- **Hypotheses**:
+  $$H_0: \mu_1 - \mu_2 = 0 \quad \text{vs.} \quad H_1: \mu_1 - \mu_2 \neq 0$$
+- **Welch test statistic**:
   $$t = \frac{\bar{x}_1 - \bar{x}_2}{\sqrt{\frac{s_1^2}{n_1} + \frac{s_2^2}{n_2}}}$$
-- **Welch–Satterthwaite Effective Degrees of Freedom**:
-  $$\nu \approx \frac{\left(\frac{s_1^2}{n_1} + \frac{s_2^2}{n_2}\right)^2}{\frac{(s_1^2 / n_1)^2}{n_1 - 1} + \frac{(s_2^2 / n_2)^2}{n_2 - 1}}$$
-- **Standardized Effect Size (Cohen's $d$)**:
+- **Welch–Satterthwaite degrees of freedom**:
+  $$\nu \approx \frac{\left(\frac{s_1^2}{n_1} + \frac{s_2^2}{n_2}\right)^2}{\frac{\left(s_1^2 / n_1\right)^2}{n_1 - 1} + \frac{\left(s_2^2 / n_2\right)^2}{n_2 - 1}}$$
+- **Descriptive effect size: Cohen's $d$**:
   $$d = \frac{\bar{x}_1 - \bar{x}_2}{s_p}, \qquad s_p = \sqrt{\frac{(n_1 - 1)s_1^2 + (n_2 - 1)s_2^2}{n_1 + n_2 - 2}}$$
 
+This is a standardized magnitude measure, not the denominator used in the Welch test. The Welch test does not assume equal variances; the pooled SD $s_p$ is used only for the descriptive effect-size summary.
+
 #### T2: Pearson's Chi-Square ($\chi^2$) Test of Independence
-Testing association between protocol group ($r=3$ rows) and traffic class ($c=2$ columns):
-- **Hypotheses**: $H_0: P(A_i \cap B_j) = P(A_i)P(B_j) \quad \text{vs.} \quad H_1: P(A_i \cap B_j) \neq P(A_i)P(B_j)$
-- **Test Statistic**:
-  $$\chi^2 = \sum_{i=1}^r \sum_{j=1}^c \frac{(O_{ij} - E_{ij})^2}{E_{ij}}, \qquad E_{ij} = \frac{R_i \cdot C_j}{N}, \qquad \text{df} = (r-1)(c-1) = 2$$
-- **Effect Size (Cramér's $V$)**:
-  $$V = \sqrt{\frac{\chi^2}{N \cdot \min(r-1, c-1)}} = \sqrt{\frac{\chi^2}{N \cdot 1}}$$
+Testing association between protocol group and traffic class in a contingency table with $r$ rows and $c$ columns:
+
+- **Hypotheses**:
+  $$H_0: P(A_i \cap B_j) = P(A_i)P(B_j) \quad \text{for all } i,j$$
+  $$H_1: \exists\,(i,j) \text{ such that } P(A_i \cap B_j) \neq P(A_i)P(B_j)$$
+- **Test statistic**:
+  $$\chi^2 = \sum_{i=1}^r \sum_{j=1}^c \frac{(O_{ij} - E_{ij})^2}{E_{ij}}$$
+  where $E_{ij} = R_i C_j / N$.
+- **Degrees of freedom**:
+  $$\mathrm{df} = (r-1)(c-1)$$
+- **Effect size: Cramér's $V$**:
+  $$V = \sqrt{\frac{\chi^2}{N \cdot \min(r-1, c-1)}}$$
+
+For the protocol-by-label table, $r=3$ and $c=2$, so $\mathrm{df}=2$ and $\min(r-1, c-1)=1$.
 
 #### T3: One-Way Analysis of Variance (ANOVA)
-Testing equality of source packet size ($\text{smean}$) across $k=6$ dominant attack categories:
-- **Hypotheses**: $H_0: \mu_1 = \mu_2 = \dots = \mu_6 \quad \text{vs.} \quad H_1: \exists \, (i, j) \text{ s.t. } \mu_i \neq \mu_j$
-- **Sums of Squares & Test Statistic**:
-  $$\text{SSB} = \sum_{j=1}^k n_j (\bar{x}_j - \bar{x})^2, \qquad \text{SSW} = \sum_{j=1}^k \sum_{i=1}^{n_j} (x_{ij} - \bar{x}_j)^2, \qquad \text{SST} = \text{SSB} + \text{SSW}$$
-  $$F = \frac{\text{MSB}}{\text{MSW}} = \frac{\text{SSB} / (k - 1)}{\text{SSW} / (N - k)} \sim F_{k-1, \, N-k}$$
-- **Effect Size ($\eta^2$, Eta-Squared)**:
-  $$\eta^2 = \frac{\text{SSB}}{\text{SST}}$$
+Testing equality of source packet size (`smean`) across $k$ groups (here, the six dominant attack categories / the normal class):
+
+- **Hypotheses**:
+  $$H_0: \mu_1 = \mu_2 = \cdots = \mu_k \quad \text{vs.} \quad H_1: \exists\, (i,j)\text{ such that }\mu_i \ne \mu_j$$
+- **Between-group sum of squares**:
+  $$\mathrm{SS}_{\text{between}} = \sum_{j=1}^k n_j (\bar{x}_j - \bar{x})^2$$
+- **Within-group sum of squares**:
+  $$\mathrm{SS}_{\text{within}} = \sum_{j=1}^k \sum_{i=1}^{n_j} (x_{ij} - \bar{x}_j)^2$$
+- **Total sum of squares**:
+  $$\mathrm{SS}_{\text{total}} = \mathrm{SS}_{\text{between}} + \mathrm{SS}_{\text{within}}$$
+- **F-statistic**:
+  $$F = \frac{\mathrm{MS}_{\text{between}}}{\mathrm{MS}_{\text{within}}} = \frac{\mathrm{SS}_{\text{between}}/(k-1)}{\mathrm{SS}_{\text{within}}/(N-k)}$$
+  where $N = \sum_j n_j$.
+- **Effect size: eta-squared**:
+  $$\eta^2 = \frac{\mathrm{SS}_{\text{between}}}{\mathrm{SS}_{\text{total}}}$$
 
 #### T4: Correlation Analysis (Pearson $r$ vs. Spearman $\rho$)
-- **Pearson Product-Moment Correlation**:
+For paired observations $(x_i, y_i)$:
+
+- **Pearson product-moment correlation**:
   $$r = \frac{\sum_{i=1}^n (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum_{i=1}^n (x_i - \bar{x})^2 \sum_{i=1}^n (y_i - \bar{y})^2}}$$
-- **Fisher $z$-Transformation for $95\%$ CI of Pearson $r$**:
-  $$z_r = \operatorname{arctanh}(r) = \frac{1}{2} \ln \left(\frac{1+r}{1-r}\right), \qquad \text{SE}_z = \frac{1}{\sqrt{n - 3}}$$
-  $$\text{CI}_{0.95}(r) = \left[ \tanh(z_r - 1.96 \cdot \text{SE}_z), \;\; \tanh(z_r + 1.96 \cdot \text{SE}_z) \right]$$
-- **Spearman Rank-Order Correlation**:
-  $$\rho = 1 - \frac{6 \sum_{i=1}^n d_i^2}{n(n^2 - 1)}, \qquad d_i = \operatorname{rank}(x_i) - \operatorname{rank}(y_i)$$
+- **Fisher $z$ transformation for a $95\%$ CI of Pearson $r$**:
+  $$z_r = \operatorname{arctanh}(r) = \frac{1}{2}\ln\left(\frac{1+r}{1-r}\right), \qquad \mathrm{SE}_{z} = \frac{1}{\sqrt{n-3}}$$
+  $$\mathrm{CI}_{0.95}(r) = \left[\tanh\left(z_r - 1.96\,\mathrm{SE}_{z}\right), \; \tanh\left(z_r + 1.96\,\mathrm{SE}_{z}\right)\right]$$
+- **Spearman rank-order correlation**:
+  $$\rho_s = \mathrm{corr}(\mathrm{rank}(X), \mathrm{rank}(Y))$$
+  For no ties, this is equivalent to
+  $$\rho_s = 1 - \frac{6\sum_{i=1}^n d_i^2}{n(n^2 - 1)}$$
+  where $d_i = \mathrm{rank}(x_i) - \mathrm{rank}(y_i)$.
+  In the presence of ties, average ranks are used and the standard rank-correlation estimator is computed from the ranked data rather than the simplified formula above.
+
+Pearson correlation measures linear association; Spearman correlation measures monotonic rank association. These are complementary summaries and are not interchangeable.
 
 ---
 
@@ -185,13 +222,13 @@ The table below presents the population statistics calculated on the entire data
   <img src="outputs/figures/hist_smean_full.png" width="48%" alt="Histogram smean">
   <img src="outputs/figures/hist_dmean_full.png" width="48%" alt="Histogram dmean">
   <br>
-  <em>Figure 2: Empirical distributions of packet sizing metrics (smean and dmean). Both display severe right-skewness where the parametric mean (red dashed line) substantially exceeds the median (black dotted line).</em>
+  <em>Figure 2: Empirical distributions of packet sizing metrics (smean and dmean). Both display severe right-skewness where the parametric mean substantially exceeds the median.</em>
 </p>
 
 ### 4.2 Sample Size Scaling Behavior: The Case of `dmean`
 Examining `dmean` across sample sizes illustrates how point estimates converge rapidly while standard errors collapse as $1/\sqrt{n}$:
 
-| Sample Size ($n$) | Mean ($\bar{x}$) | Median | Variance ($s^2$) | Std ($s$) | Skewness ($g_1$) | Kurtosis ($g_2$) | Standard Error ($\text{SE}$) |
+| Sample Size ($n$) | Mean ($\bar{x}$) | Median | Variance ($s^2$) | Std ($s$) | Skewness ($g_1$) | Kurtosis ($g_2$) | Standard Error ($\mathrm{SE}$) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **$n = 500$** | $123.4300$ | $44.00$ | $65,370.85$ | $255.6772$ | $+2.8292$ | $+7.8096$ | $11.4342$ |
 | **$n = 2,000$** | $123.3375$ | $44.00$ | $63,705.25$ | $252.3990$ | $+2.8324$ | $+7.7194$ | $5.6438$ |
@@ -199,13 +236,13 @@ Examining `dmean` across sample sizes illustrates how point estimates converge r
 | **Full ($N = 257,673$)** | $121.6497$ | $44.00$ | $64,536.84$ | $254.0410$ | $+2.9101$ | $+8.2608$ | $0.5005$ |
 
 > [!NOTE]
-> **Key Insight**: The median is exactly **$44.00\text{ bytes}$** across every single sample size, underscoring its robustness as an estimator of location in skewed traffic. Meanwhile, $\text{SE}(\bar{x})$ declines from $11.43$ at $n=500$ down to $0.50$ in the full population—a $22.8\times$ reduction governed precisely by $\sqrt{257,673 / 500} \approx 22.7$.
+> **Key Insight**: The median is robust to skew and remains near $44\,\text{bytes}$ across samples, while the mean remains unstable under heavy-tailed behavior and the SE shrinks at the expected $n^{-1/2}$ rate.
 
 <p align="center">
   <img src="outputs/figures/hist_log_sbytes_full.png" width="48%" alt="Log sbytes Distribution">
   <img src="outputs/figures/box_dmean_by_label.png" width="48%" alt="Boxplot dmean by Label">
   <br>
-  <em>Figure 3: (Left) $\log_{1p}(\text{sbytes})$ distribution resolving extreme 5-decade skew into a readable bimodal structure. (Right) Boxplot of dmean partitioned by class (Normal vs. Attack) at n = 10,000, revealing clean distributional separation.</em>
+  <em>Figure 3: (Left) $\log_{1p}(\text{sbytes})$ distribution resolving extreme skew into a readable structure. (Right) Boxplot of dmean partitioned by class (Normal vs. Attack).</em>
 </p>
 
 ---
@@ -216,22 +253,22 @@ Examining `dmean` across sample sizes illustrates how point estimates converge r
 
 | Variable | Metric | $n = 500$ | $n = 2,000$ | $n = 10,000$ | Full Population ($N = 257,673$) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`dmean`** | Point Mean ($\bar{x}$)<br>$95\%$ CI<br>**CI Width** | $123.43$<br>$[100.96, 145.90]$<br>**$44.93$** | $123.34$<br>$[112.27, 134.41]$<br>**$22.14$** | $125.24$<br>$[120.17, 130.32]$<br>**$10.15$** | $121.65$<br>$[120.67, 122.63]$<br>**$1.96$** |
-| **`smean`** | Point Mean ($\bar{x}$)<br>$95\%$ CI<br>**CI Width** | $140.30$<br>$[121.27, 159.32]$<br>**$38.05$** | $142.29$<br>$[132.87, 151.72]$<br>**$18.85$** | $132.45$<br>$[128.56, 136.35]$<br>**$7.79$** | $137.64$<br>$[136.84, 138.43]$<br>**$1.59$** |
-| **`dur`** | Point Mean ($\bar{x}$)<br>$95\%$ CI<br>**CI Width** | $1.166$<br>$[0.644, 1.688]$<br>**$1.044$** | $1.158$<br>$[0.913, 1.403]$<br>**$0.490$** | $1.210$<br>$[1.095, 1.325]$<br>**$0.230$** | $1.247$<br>$[1.224, 1.270]$<br>**$0.046$** |
-| **`sbytes`** | Point Mean ($\bar{x}$)<br>$95\%$ CI<br>**CI Width** | $4,310.90$<br>$[2,641.68, 5,980.11]$<br>**$3,338.43$** | $8,999.40$<br>$[2,840.12, 15,158.67]$<br>**$12,318.55$** | $7,580.83$<br>$[5,177.99, 9,983.67]$<br>**$4,805.68$** | $8,572.95$<br>$[7,901.99, 9,243.92]$<br>**$1,341.93$** |
-| **`dbytes`** | Point Mean ($\bar{x}$)<br>$95\%$ CI<br>**CI Width** | $13,629.54$<br>$[5,868.96, 21,390.12]$<br>**$15,521.16$** | $13,152.73$<br>$[8,272.94, 18,032.51]$<br>**$9,759.57$** | $13,972.53$<br>$[12,008.53, 15,936.54]$<br>**$3,928.01$** | $14,387.29$<br>$[13,822.80, 14,951.78]$<br>**$1,128.98$** |
-| **`rate`** | Point Mean ($\bar{x}$)<br>$95\%$ CI<br>**CI Width** | $85,286.35$<br>$[73,554.14, 97,018.55]$<br>**$23,464.41$** | $88,307.71$<br>$[81,608.94, 95,006.49]$<br>**$13,397.55$** | $90,083.38$<br>$[86,973.92, 93,192.84]$<br>**$6,218.93$** | $91,253.91$<br>$[90,634.80, 91,873.02]$<br>**$1,238.22$** |
+| **`dmean`** | Point Mean ($\bar{x}$)<br>$95\%$ CI<br>**CI Width** | $123.43$<br>$[100.96, 145.90]$<br>**$44.93$** | $123.34$<br>$[112.27, 134.41]$<br>**$22.14$** | $125.24$<br>$[120.17, 130.32]$<br>**$10.15$** | $121.65$<br>$[120.65, 122.64]$<br>**$1.99$** |
+| **`smean`** | Point Mean ($\bar{x}$)<br>$95\%$ CI<br>**CI Width** | $140.30$<br>$[121.27, 159.32]$<br>**$38.05$** | $142.29$<br>$[132.87, 151.72]$<br>**$18.85$** | $132.45$<br>$[128.56, 136.35]$<br>**$7.79$** | $137.64$<br>$[136.84, 138.44]$<br>**$1.60$** |
+| **`dur`** | Point Mean ($\bar{x}$)<br>$95\%$ CI<br>**CI Width** | $1.166$<br>$[0.644, 1.688]$<br>**$1.044$** | $1.158$<br>$[0.913, 1.403]$<br>**$0.490$** | $1.210$<br>$[1.095, 1.325]$<br>**$0.230$** | $1.2467$<br>$[1.223, 1.271]$<br>**$0.048$** |
+| **`sbytes`** | Point Mean ($\bar{x}$)<br>$95\%$ CI<br>**CI Width** | $4,310.90$<br>$[2,641.68, 5,980.11]$<br>**$3,338.43$** | $8,999.40$<br>$[2,840.12, 15,158.67]$<br>**$12,318.55$** | $7,580.83$<br>$[5,784.42, 9,377.24]$<br>**$3,592.82$** | $8,572.95$<br>$[7,901.59, 9,244.31]$<br>**$1,342.72$** |
+| **`dbytes`** | Point Mean ($\bar{x}$)<br>$95\%$ CI<br>**CI Width** | $13,629.54$<br>$[5,868.96, 21,390.12]$<br>**$15,521.16$** | $13,152.73$<br>$[8,272.94, 18,032.51]$<br>**$9,759.57$** | $13,972.53$<br>$[12,212.60, 15,732.46]$<br>**$3,519.86$** | $14,387.29$<br>$[13,827.24, 14,947.34]$<br>**$1,120.10$** |
+| **`rate`** | Point Mean ($\bar{x}$)<br>$95\%$ CI<br>**CI Width** | $85,286.35$<br>$[73,554.14, 97,018.55]$<br>**$23,464.41$** | $88,307.71$<br>$[81,608.94, 95,006.49]$<br>**$13,397.55$** | $90,083.31$<br>$[86,020.34, 94,146.28]$<br>**$8,125.94$** | $91,253.91$<br>$[90,628.56, 91,879.27]$<br>**$1,250.71$** |
 
 <p align="center">
   <img src="outputs/figures/line_ciwidth_vs_n.png" width="48%" alt="CI Width vs Sample Size">
   <img src="outputs/figures/line_mean_dmean_vs_n.png" width="48%" alt="Mean dmean with Error Bars vs Sample Size">
   <br>
-  <em>Figure 4: (Left) Log-log plot of 95% CI width vs. sample size n confirming strict $1/\sqrt{n}$ decay. (Right) Stability of point estimate \bar{x}_{\text{dmean}} across sample sizes alongside shrinking 95% confidence bounds.</em>
+  <em>Figure 4: (Left) Log-log plot of 95% CI width vs. sample size $n$, confirming the expected $1/\sqrt{n}$ decay. (Right) Stability of the sample mean $\bar{x}_{\text{dmean}}$ across sample sizes alongside shrinking uncertainty bands.</em>
 </p>
 
 ### 5.2 95% Confidence Intervals for Population Attack Proportion $P(\text{Attack})$
-Evaluating the empirical attack proportion $\hat{p} = \frac{\text{attacks}}{n}$:
+Evaluating the empirical attack proportion $\hat{p} = k/n$:
 
 | Sample Size ($n$) | Attack Count ($k$) | Point Estimate ($\hat{p}$) | $95\%$ Wald CI | $95\%$ Wilson Score CI | Wilson Width ($\Delta$) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -240,7 +277,7 @@ Evaluating the empirical attack proportion $\hat{p} = \frac{\text{attacks}}{n}$:
 | **$n = 10,000$** | $6,366$ | $0.6366$ ($63.66\%$) | $[0.6272, 0.6460]$ | $[0.6271, 0.6460]$ | $0.0189$ ($\pm 0.9\%$) |
 | **Full ($N = 257,673$)** | $164,673$ | $0.6391$ ($63.91\%$) | $[0.6372, 0.6409]$ | $[0.6372, 0.6409]$ | $0.0037$ ($\pm 0.18\%$) |
 
-All intervals cross-validate and capture the population proportion ($63.91\%$). Even at $n=500$, the Wilson score interval isolates the attack share within an $8.4\%$ band.
+All intervals contain the full-population value and tighten as expected with $n$.
 
 ---
 
@@ -252,9 +289,9 @@ All hypothesis tests were evaluated at a significance threshold of **$\alpha = 0
 
 ### 6.1 T1: Welch's Two-Sample t-Test (dmean: Normal vs. Attack)
 - **Null Hypothesis ($H_0$)**: $\mu_{\text{Normal}} = \mu_{\text{Attack}}$ (mean destination packet size is identical)
-- **Alternative Hypothesis ($H_1$)**: $\mu_{\text{Normal}} \neq \mu_{\text{Attack}}$ (two-sided)
+- **Alternative Hypothesis ($H_1$)**: $\mu_{\text{Normal}} \ne \mu_{\text{Attack}}$ (two-sided)
 
-| Sample ($n$) | $n_{\text{norm}}$ | $n_{\text{atk}}$ | $\bar{x}_{\text{norm}}$ (B) | $\bar{x}_{\text{atk}}$ (B) | Difference ($\Delta$) | Welch $t$-Stat | Welch df ($\nu$) | $p$-Value | $95\%$ CI of Difference | Cohen's $d$ | Decision ($\alpha=0.05$) |
+| Sample ($n$) | $n_{\text{norm}}$ | $n_{\text{atk}}$ | $\bar{x}_{\text{norm}}$ (B) | $\bar{x}_{\text{atk}}$ (B) | Difference ($\Delta$) | Welch $t$-Stat | Welch df ($\nu$) | $p$-Value | $95\%$ CI of $\Delta$ | Cohen's $d$ | Decision |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **$n = 500$** | $185$ | $315$ | $222.08$ | $65.50$ | $+156.58$ | $6.228$ | $277.9$ | $1.74 \times 10^{-9}$ | $[107.08, 206.08]$ | $0.640$ | **Reject $H_0$** |
 | **$n = 2,000$** | $697$ | $1,303$ | $222.67$ | $70.20$ | $+152.46$ | $12.067$ | $1,060.1$ | $1.64 \times 10^{-31}$ | $[127.67, 177.25]$ | $0.631$ | **Reject $H_0$** |
@@ -264,11 +301,11 @@ All hypothesis tests were evaluated at a significance threshold of **$\alpha = 0
 <p align="center">
   <img src="outputs/figures/bar_dmean_means_vs_n.png" width="700" alt="Bar Plot dmean Means vs n">
   <br>
-  <em>Figure 5: Mean destination packet size (dmean) for Normal vs. Attack traffic across all sample sizes. The empirical difference (~156 bytes) is invariant to sample size.</em>
+  <em>Figure 5: Mean destination packet size (dmean) for Normal vs. Attack traffic across all sample sizes. The empirical difference is stable and large relative to variability.</em>
 </p>
 
 > [!IMPORTANT]
-> **Inferential Takeaway**: $H_0$ is decisively rejected across all sample tiers ($p < 10^{-8}$). Normal connections elicit substantially larger destination packet replies ($\sim 221\text{ B}$ vs. $\sim 65\text{ B}$) because benign requests retrieve actual payload data, whereas attacks primarily comprise probes, scans, or one-way floods. Notice that **Cohen's $d \approx 0.64$** (medium-large effect) is completely stable from $n=500$ to $N=257,673$; increasing $n$ only inflates $t$ and contracts the confidence band around the difference from $99.0\text{ B}$ to $4.38\text{ B}$.
+> **Inferential Takeaway**: $H_0$ is rejected decisively across all sample tiers. Normal connections show substantially larger destination packet sizes than attack connections; the standardized difference is moderate-to-large ($d \approx 0.64$), while the test significance grows with $n$ because the SE shrinks.
 
 ---
 
@@ -299,7 +336,7 @@ All hypothesis tests were evaluated at a significance threshold of **$\alpha = 0
 </p>
 
 > [!NOTE]
-> **Inferential Takeaway**: Protocol choice heavily predicts malicious activity: `tcp` carries over $54\%$ normal traffic, `udp` is over $76\%$ attack, and esoteric protocols (`other`) are over $90\%$ attack traffic. Notice how $\chi^2$ scales directly with $N$ ($75.8 \to 281.7 \to 1,528.7 \to 36,843.4$), whereas **Cramér's $V \approx 0.38$** remains completely invariant across all sample tiers.
+> **Inferential Takeaway**: Protocol choice is statistically associated with malicious activity: `tcp` is majority-normal, while `udp` and `other` disproportionately carry attack traffic. The effect is consistent in a practical sense across all sample tiers ($V \approx 0.38$), even though the test statistic and $p$-value become increasingly extreme as $n$ grows.
 
 ---
 
@@ -328,11 +365,11 @@ All hypothesis tests were evaluated at a significance threshold of **$\alpha = 0
 <p align="center">
   <img src="outputs/figures/box_smean_by_attackcat.png" width="780" alt="Boxplot smean by Attack Category">
   <br>
-  <em>Figure 7: Boxplot of source packet size (smean) across top 6 attack categories. Fuzzers and Exploits generate large payloads, while Generic attacks and Reconnaissance remain compact.</em>
+  <em>Figure 7: Boxplot of source packet size (smean) across the top 6 attack categories. Fuzzers and Exploits generate large payloads, while Generic attacks and Reconnaissance remain compact.</em>
 </p>
 
 > [!NOTE]
-> **Inferential Takeaway**: Mean packet size varies systematically by attack vector ($p < 0.001$). Fuzzers inject large randomized payload buffers ($\bar{x} = 238.83\text{ B}$), whereas Generic attacks and Reconnaissance rely on small probe packets ($\bar{x} = 61.96\text{ B}$ and $79.10\text{ B}$). $\eta^2$ stays stable between $5\%$ and $8\%$, explaining approximately $7\%$ of overall source packet variance.
+> **Inferential Takeaway**: The observed difference in mean `smean` across attack families is statistically significant and practically meaningful, but the effect size remains moderate ($\eta^2 \approx 0.07$). This is exactly the expected pattern when a large sample makes the test sensitive but the underlying difference is not dramatic.
 
 ---
 
@@ -345,70 +382,71 @@ All hypothesis tests were evaluated at a significance threshold of **$\alpha = 0
 | **$n = 500$** | $500$ | $+0.0544$ | $0.2247$ | $[-0.0335, +0.1414]$ | $+0.8140$ | $1.41 \times 10^{-119}$ | Linear null unrejected; strong rank correlation |
 | **$n = 2,000$** | $2,000$ | $+0.0092$ | $0.6813$ | $[-0.0347, +0.0530]$ | $+0.8019$ | $\approx 0.0$ | Linear null unrejected; strong rank correlation |
 | **$n = 10,000$** | $10,000$ | $+0.0128$ | $0.2005$ | $[-0.0068, +0.0324]$ | $+0.8020$ | $\approx 0.0$ | Linear null unrejected; strong rank correlation |
-| **Full ($N = 257,673$)** | $257,673$ | $+0.00997$ | $4.19 \times 10^{-7}$ | $[+0.0061, +0.0138]$ | $+0.7942$ | $\approx 0.0$ | **Pearson flips to significant by sample size alone** |
+| **Full ($N = 257,673$)** | $257,673$ | $+0.00997$ | $4.19 \times 10^{-7}$ | $[+0.0061, +0.0138]$ | $+0.7942$ | $\approx 0.0$ | **Pearson remains near zero while Spearman is very large** |
 
 <p align="center">
   <img src="outputs/figures/scatter_sbytes_dbytes.png" width="48%" alt="Scatter sbytes vs dbytes">
   <img src="outputs/figures/scatter_spkts_sbytes.png" width="48%" alt="Scatter spkts vs sbytes">
   <br>
-  <em>Figure 8: (Left) Scatterplot of \log_{1p}(\text{sbytes}) vs. \log_{1p}(\text{dbytes}) showing monotonic rank correlation despite near-zero linear Pearson r. (Right) \text{spkts} vs. \log_{1p}(\text{sbytes}).</em>
+  <em>Figure 8: (Left) Scatterplot of $\log_{1p}(\text{sbytes})$ vs. $\log_{1p}(\text{dbytes})$ showing a strong monotone association despite near-zero linear Pearson $r$. (Right) Scatterplot of `spkts` vs. $\log_{1p}(\text{sbytes})$.</em>
 </p>
 
 > [!WARNING]
-> **The Big Data p-Value Trap**: Test T4 offers a quintessential statistical lesson:
-> 1. **Pearson $r \approx 0.01$** measures strictly *linear* co-variation. Because network byte distributions are heavily right-skewed and non-linear, raw linear correlation is near zero. At $n=500, 2000, 10000$, Pearson $r$ is correctly classified as **not statistically significant** ($p > 0.20$). However, when evaluated at $N = 257,673$, that exact same trivial effect ($r = 0.00997$) generates a $p$-value of **$4.19 \times 10^{-7}$**!
-> 2. **Spearman $\rho \approx 0.80$** assesses monotonic ordering. In reality, flows that send larger volumes of packets systematically receive larger volumes of replies in rank order ($p < 10^{-100}$ at every sample size). Relying on Pearson correlation or raw $p$-values without rank transformations or effect size inspection would produce erroneous conclusions.
+> **The Big Data $p$-Value Trap**: Pearson $r$ is nearly zero because the relationship is not well described by a linear model after heavy-tailed skewness. Spearman $\rho$ remains large because the relationship is strongly monotonic. In large samples, even very small linear correlations become statistically significant; therefore, effect sizes and pattern diagnostics must be read alongside the $p$-value.
 
 ---
 
 ## 7. Empirical Synthesis: The Effect of Sample Size
 
-Across all six continuous variables and four hypothesis test suites, the empirical findings reveal four fundamental principles of statistical scaling:
+Across all six continuous variables and the four inferential suites, the empirical findings reveal four fundamental principles of statistical scaling:
 
 ```mermaid
 flowchart TD
-    A["Increasing Sample Size (n = 500 → 2,000 → 10,000 → 257,673)"] --> B["Standard Errors & CI Widths Shrink as 1/√n"]
-    A --> C["Point Estimates Freeze Early (Means, Medians, Effect Sizes)"]
-    A --> D["Test Statistics (t, χ², F) Inflate with n → p-Values Collapse to 0"]
-    A --> E["Heavy-Tail Sensitivity: Mean Volatility in Extreme Skew (sbytes)"]
+    A["Increasing Sample Size (n = 500 → 2,000 → 10,000 → 257,673)"] --> B["Standard errors and CI widths shrink as 1/√n"]
+    A --> C["Point estimates stabilize early"]
+    A --> D["Test statistics (t, χ², F) inflate with n → p-values collapse toward 0"]
+    A --> E["Heavy tails magnify instability of the mean"]
 
-    B --> F["Precision Expansion (Certainty)"]
-    C --> G["Invariance of Underlying Physical Phenomenon"]
-    D --> H["Effect Size Inspection Required (d, V, η², ρ)"]
-    E --> I["Medians & Rank Methods Preferred for Network Flow Telemetry"]
+    B --> F["Greater precision"]
+    C --> G["Stable location/effect estimates"]
+    D --> H["Use effect sizes and CIs to interpret significance"]
+    E --> I["Medians and rank-based methods are often more stable"]
 ```
 
-1. **Precision Scales Strictly as $1/\sqrt{n}$**:
-   - The width of the $95\%$ CI for $\bar{x}_{\text{dmean}}$ collapses from $44.93\text{ B}$ ($n=500$) $\to 22.14\text{ B}$ ($n=2,000$) $\to 10.15\text{ B}$ ($n=10,000$) $\to 1.96\text{ B}$ ($N=257,673$). Each $10\times$ increase in sample size reduces interval uncertainty by a factor of $\sqrt{10} \approx 3.16$.
-   - The $95\%$ Wilson confidence interval for the attack share tightens from $\pm 4.22\%$ ($n=500$) to $\pm 0.18\%$ ($N=257,673$).
-2. **Point Estimates Stabilize Early**:
-   - Location metrics ($\bar{x}_{\text{dmean}} \approx 122 - 125\text{ B}$, $\text{median} = 44\text{ B}$) and effect sizes (Cohen's $d \approx 0.64$, Cramér's $V \approx 0.38$, $\eta^2 \approx 0.07$, Spearman $\rho \approx 0.80$) are captured accurately even at $n=500$. Larger sample sizes purchase certainty, not different qualitative answers.
-3. **Test Statistics Scale with $n$; Effect Sizes Do Not**:
-   - Welch $t$ expands from $6.23 \to 139.7$
-   - $\chi^2$ expands from $75.8 \to 36,843.4$
-   - ANOVA $F$ expands from $5.03 \to 3,744.2$
-   - Relying on $p$-values alone without effect sizes creates an illusion of scientific importance in massive datasets.
-4. **Vulnerability of Heavy Tails at Small $n$**:
-   - For bounded variables like `smean` and `dmean`, $n=500$ is sufficient. However, for extreme Pareto variables like `sbytes`, a sample of $n=500$ underestimates the true population mean ($4,310.90\text{ B}$ vs. $8,572.95\text{ B}$) because rare "elephant flows" ($14\text{ MB}$) are omitted by random chance. Network analytics should always pair parametric summaries with robust metrics ($\text{median}$, $\text{IQR}$) and logarithmic transformations.
+1. **Precision scales as $1/\sqrt{n}$**:
+   - The width of the $95\%$ CI for $\bar{x}_{\text{dmean}}$ shrinks from about $44.93$ bytes ($n=500$) to about $1.99$ bytes in the full data.
+   - The Wilson interval for the attack proportion narrows from about $\pm 4.2\%$ at $n=500$ to about $\pm 0.18\%$ in the full population.
+2. **Point estimates stabilize early**:
+   - Location metrics such as the mean and median of `dmean` converge quickly, while the underlying effect remains qualitatively unchanged.
+   - Standardized effects (Cohen's $d$, Cramér's $V$, $\eta^2$, Spearman $\rho$) remain relatively stable across sample sizes.
+3. **Test statistics scale with $n$; effect sizes do not**:
+   - Welch $t$ rises from $6.23$ to $139.7$.
+   - $\chi^2$ rises from $75.8$ to $36{,}843.4$.
+   - ANOVA $F$ rises from $5.03$ to $3{,}744.2$.
+   - This is not a contradiction: as $n$ increases, uncertainty decreases, so the same underlying effect becomes more statistically precise.
+4. **Heavy tails matter**:
+   - For bounded variables such as `smean` and `dmean`, moderate sample sizes already capture the main structure well.
+   - For strongly skewed variables such as `sbytes`, smaller samples can misrepresent the mean and produce unstable interval estimates; medians and rank-based methods are more reliable descriptive summaries.
 
 ### Practical Engineering Recommendation
-- **$n = 500$**: Suitable for rapid exploratory detection of large effects ($d > 0.5$). Group means for rare attack types (e.g. DoS $n=30$, Recon $n=23$) are noisy.
-- **$n = 2,000$**: Sufficient to replicate **every qualitative and substantive conclusion** of the full population study.
-- **$n = 10,000$**: Delivers high-precision engineering confidence intervals ($\pm 5\text{ bytes}$ on packet sizes) without the computational overhead of processing quarter-million row databases.
-- **Full Population ($N = 257,673$)**: Essential for auditing rare classes (Worms $n=174$, Shellcode $n=1,511$) and regulatory baseline reporting.
+- **$n = 500$**: Useful for rapid exploratory detection of large effects.
+- **$n = 2{,}000$**: Typically sufficient to replicate the major qualitative findings of the full study.
+- **$n = 10{,}000$**: Strong precision for engineering reporting without the full computational cost of the population-level analysis.
+- **Full Population ($N = 257{,}673$)**: Appropriate for auditing rare classes, final benchmark reporting, and defensible estimates of rare-event proportions.
 
 ---
 
 ## 8. Literature Benchmark & Context (2025–2026)
 
-Our empirical and distributional findings provide foundational context for contemporary machine learning benchmarks conducted on UNSW-NB15:
+Our empirical and distributional findings provide context for contemporary machine learning benchmarks conducted on UNSW-NB15:
 
-- **Alkhater, N. (2026)**. *A Rigorous Comparative Study of Supervised ML Techniques for Network Anomaly Detection: Empirical Insights from the UNSW-NB15 Dataset*. **Computers**, 15(5), 285. [doi:10.3390/computers15050285](https://doi.org/10.3390/computers15050285).
-  - Evaluated Decision Trees, Random Forests, Support Vector Machines (SVM), and XGBoost via 5-fold stratified cross-validation on the same $N \approx 257\text{k}$ record corpus.
+- **Alkhater, N. (2026)**. *A Rigorous Comparative Study of Supervised ML Techniques for Network Anomaly Detection: Empirical Insights from the UNSW-NB15 Dataset*. **Computers**, 15(5), 285.
+  - Evaluated Decision Trees, Random Forests, Support Vector Machines (SVM), and XGBoost on the same $N \approx 257\text{k}$ record corpus.
   - Demonstrated that **XGBoost achieved the highest performance** ($\text{Accuracy} = 0.97$, $\text{AUC} = 0.98$), identifying packet sizing and traffic volume features as top predictors.
-  - **Connection to Our Findings**: The clean distributional separation identified in our Welch $t$-test (T1: Cohen's $d = 0.64$ in `dmean`) and the distinct attack family signatures confirmed in our ANOVA (T3: $\eta^2 = 0.07$ in `smean`) explain why tree-based gradient boosted ensembles capture decision boundaries with near-zero error.
-- **Transformer & Leakage-Safe Architectures (2025–2026)**:
-  - Recent studies (*Scientific Reports*, Aug 2026; *IIETA*, Jul 2026) report $96.8\%$ anomaly detection accuracy using attention-based temporal encoders on UNSW-NB15, reinforcing the strong discriminative signal present in its packet-rate dynamics.
+  - The observed distributional separation between normal and attack traffic aligns with the large effect sizes found in our comparative testing.
+- **Transformer & leakage-safe architectures (2025–2026)**:
+  - Recent studies report high anomaly-detection performance via transformer-based and leakage-safe temporal models on UNSW-NB15.
+  - These results reinforce the strong discriminative structure present in the dataset, particularly in packet size, byte volume, and class-conditional distributional patterns.
 
 ---
 
@@ -438,7 +476,7 @@ Our empirical and distributional findings provide foundational context for conte
     │   ├── 06_anova_smean_by_attackcat.csv      # One-way ANOVA F-tests & eta-squared
     │   ├── 06_groupmeans_smean_full.csv         # Category group means, medians, std
     │   └── 07_correlation_sbytes_dbytes.csv     # Pearson r & Spearman rho with Fisher-z CI
-    └── figures/                           # 300 DPI high-resolution publication figures (15 plots)
+    └── figures/                           # Publication-quality figures (15 plots)
         ├── bar_attackcat_counts.png       # Flow frequency by attack category
         ├── bar_dmean_means_vs_n.png       # Mean dmean (Normal vs. Attack) across n
         ├── bar_proto_by_label.png         # Protocol composition by traffic class
@@ -458,45 +496,45 @@ Our empirical and distributional findings provide foundational context for conte
 
 > [!NOTE]
 > **Repository Architecture & Git Ignore Policy**:
-> To keep the repository lightweight, fast to clone, and strictly focused on reproducible data science, the repository tracks the dataset parquet files, the master computation engine (`analysis.py`), and the resulting outputs (all CSV tables and PNG figures). Compiled binary report documents (`*.docx`), presentation decks (`*.pptx`), local document-formatting scripts (`make_*.py`), virtual environments (`.venv/`), and OS cache files are excluded via `.gitignore`. All analytical findings, numerical results, and visual artifacts from the report and presentations are fully documented directly within this `README.md`.
+> The repository stores the parquet datasets, the statistical engine (`analysis.py`), and generated outputs needed for reproducibility. The raw data remain explicit inputs to the workflow and are intended to be re-used and audited.
 
 ---
 
 ## 10. Reproducibility & Execution Guide
 
 ### 10.1 Environment Setup
-The codebase requires Python 3.10+ and standard scientific data libraries.
+The codebase requires Python 3.10+ and standard scientific libraries.
 
 ```bash
 # Clone the repository
 git clone https://github.com/<your-username>/UNSW-NB15-Statistical-Analysis.git
 cd UNSW-NB15-Statistical-Analysis
 
-# Create and activate virtual environment
+# Create and activate a virtual environment
 python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate   # On Windows: .venv\Scripts\activate
 
-# Install required packages
+# Install dependencies
 pip install numpy pandas scipy matplotlib seaborn pyarrow
 ```
 
 ### 10.2 Reproducing All Statistical Outputs & Plots
-Execute the core computation engine. The script samples the population deterministically (`seed=11` for $n=500$, `seed=22` for $n=2,000$, `seed=33` for $n=10,000$) and exports all 14 CSV tables and 15 figures:
+The analysis script samples the population deterministically (`seed=11` for $n=500$, `seed=22` for $n=2{,}000$, `seed=33` for $n=10{,}000$) and exports all tables and figures used in the report.
 
 ```bash
 python analysis.py
 ```
 
-This single command reads the raw parquet datasets from `archive/`, executes the sampling, performs all descriptive and inferential tests (Welch's $t$, $\chi^2$, ANOVA, Pearson/Spearman correlation), and regenerates every table in `outputs/tables/` and every plot in `outputs/figures/`.
+This command reads the parquet datasets in `archive/`, computes descriptive summaries, builds confidence intervals, performs the four inferential tests, and writes the CSV tables and PNG plots to `outputs/`.
 
 ---
 
 ## 11. References & Citation
 
-1. **Moustafa, N., & Slay, J. (2015)**. *UNSW-NB15: A comprehensive data set for network intrusion detection systems (UNSW-NB15 network data set)*. Military Communications and Information Systems Conference (MilCIS), IEEE, 1–6. [doi:10.1109/MilCIS.2015.7348942](https://doi.org/10.1109/MilCIS.2015.7348942).
-2. **Moustafa, N., & Slay, J. (2016)**. *The evaluation of Network Anomaly Detection Systems: Statistical analysis of the UNSW-NB15 data set and the comparison with the KDD99 data set*. **Information Security Journal: A Global Perspective**, 25(1–3), 18–31.
-3. **Alkhater, N. (2026)**. *A Rigorous Comparative Study of Supervised ML Techniques for Network Anomaly Detection: Empirical Insights from the UNSW-NB15 Dataset*. **Computers**, 15(5), 285. [doi:10.3390/computers15050285](https://doi.org/10.3390/computers15050285).
-4. **Welch, B. L. (1947)**. *The generalization of 'Student's' problem when several different population variances are involved*. **Biometrika**, 34(1/2), 28–35.
+1. **Moustafa, N., & Slay, J. (2015)**. *UNSW-NB15: A comprehensive data set for network intrusion detection systems (UNSW-NB15 network data set)*. Military Communications and Information Systems Conference (MilCIS).
+2. **Moustafa, N., & Slay, J. (2016)**. *The evaluation of network anomaly detection systems: statistical analysis of the UNSW-NB15 data set and comparison with the KDD99 data set*. **Information Security and Privacy**.
+3. **Alkhater, N. (2026)**. *A Rigorous Comparative Study of Supervised ML Techniques for Network Anomaly Detection: Empirical Insights from the UNSW-NB15 Dataset*. **Computers**, 15(5), 285.
+4. **Welch, B. L. (1947)**. *The generalization of Student's problem when several different population variances are involved*. **Biometrika**, 34(1/2), 28–35.
 5. **Wilson, E. B. (1927)**. *Probable inference, the law of succession, and statistical inference*. **Journal of the American Statistical Association**, 22(158), 209–212.
 6. **Cohen, J. (1988)**. *Statistical Power Analysis for the Behavioral Sciences* (2nd ed.). Lawrence Erlbaum Associates.
 
@@ -504,4 +542,4 @@ This single command reads the raw parquet datasets from `archive/`, executes the
 
 ## License
 This project is licensed under the terms of the [MIT License](LICENSE).
-All datasets utilized remain intellectual property of the Australian Centre for Cyber Security (ACCS) and UNSW Canberra.
+All datasets utilized remain the property of the Australian Centre for Cyber Security (ACCS) and UNSW Canberra.
